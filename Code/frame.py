@@ -18,7 +18,7 @@ class JumpProcessMasterEquation:
         Args:
             N (int): number of states in the system
             initial_dist (np.ndarray): initial distribution of the system
-            transition_matrix (np.ndarray): 2D array where entry [a, b] (a neq b) is the transition rate from a to b and [a, a] is the exit rate = -sum of all [a, b] terms
+            transition_matrix (np.ndarray): 2D array where entry [b, a] (a neq b) is the transition rate from a to b and [a, a] is the exit rate = -sum of all [a, b] terms
             M (int): resolution of time we choose
         """
         self.N = N
@@ -60,7 +60,7 @@ class JumpProcessMasterEquation:
             if tau <= final_time:
                 state_time.append(tau)
                 # figure out which state it transitions to
-                transition_dist = self.transition_matrix[trajectory[-1] - 1] / (
+                transition_dist = self.transition_matrix[:, trajectory[-1] - 1] / (
                     -self.transition_matrix[trajectory[-1] - 1, trajectory[-1] - 1]
                 )
                 transition_dist[trajectory[-1] - 1] = 0
@@ -80,9 +80,9 @@ class JumpProcessMasterEquation:
         """
         propagator = la.expm(self.transition_matrix * t)
 
-        return np.matmul(propagator.T, self.initial_dist)
+        return np.matmul(propagator, self.initial_dist)
 
-    def empirical_probability(self, t: float, sample_size: int):
+    def empirical_probability(self, t: float, traj, traj_time):
         """Cakculating empirical probability from a set of sample_size trajectories spanning from 0 to t. We consider a discretisation of N intermediate steps
 
         Args:
@@ -99,20 +99,21 @@ class JumpProcessMasterEquation:
         dt = t / self.M
 
         time = np.arange(0, self.M) * dt
+        sample_size = len(traj)
 
         for i in range(sample_size):
-            trajectory, trajectory_time = self.Trajectory_sample(t)
+            # trajectory, trajectory_time = self.Trajectory_sample(t)
             # print(trajectory, trajectory_time)
             index = 0
             for k in range(self.M):
-                for j in range(len(trajectory_time)):
+                for j in range(len(traj_time[i])):
                     # print(time[k], trajectory_time[j], len(trajectory_time))
-                    if time[k] < trajectory_time[j]:
+                    if time[k] < traj_time[i][j]:
                         index = j - 1
                         break
 
                 # print(index, trajectory[index] - 1)
-                p[k, trajectory[index] - 1] += 1
+                p[k, traj[i][index] - 1] += 1
 
         self.p = p / sample_size
         self.time = time
@@ -128,11 +129,11 @@ class JumpProcessMasterEquation:
                 for j in range(k, self.N):
                     if self.transition_matrix[k, j] > 0:
                         z[k, j, m] = (
-                            self.transition_matrix[k, j] * self.p[m, k]
-                            - self.transition_matrix[j, k] * self.p[m, j]
+                            self.transition_matrix[j, k] * self.p[m, k]
+                            - self.transition_matrix[k, j] * self.p[m, j]
                         ) / (
-                            self.transition_matrix[k, j] * self.p[m, k]
-                            + self.transition_matrix[j, k] * self.p[m, j]
+                            self.transition_matrix[j, k] * self.p[m, k]
+                            + self.transition_matrix[k, j] * self.p[m, j]
                         )
                         z[j, k, m] = -z[k, j, m]
 
@@ -141,6 +142,11 @@ class JumpProcessMasterEquation:
 
     def current_full(self, t: float, N: int):
         return 0
+
+
+
+
+
 
 
 def k_singlecycle(A: np.ndarray, E: np.ndarray, cyc: np.ndarray, scaling: float, direction: int):
@@ -470,7 +476,12 @@ def plot_network(A, ax_plot, we=np.ones((6, 6)), position={1:(0,0),2:(1,0),3:(2,
         
     # plt.savefig(name, dpi=500, bbox_inches="tight")
 
-
+def printMatrix(s):
+    
+    for i in range(len(s)):
+        for j in range(len(s[0])):
+            print("%.2f   " % (s[i][j]), end="")
+        print("\n") 
 
 
 
